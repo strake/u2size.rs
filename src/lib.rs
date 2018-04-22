@@ -1,5 +1,7 @@
 #![no_std]
 
+#![feature(asm)]
+
 use core::ops::*;
 
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -43,6 +45,18 @@ impl u2size {
         let (lsw, c) = subc(x.lsw, y.lsw, false);
         let (msw, c) = subc(x.msw, y.msw, c);
         (u2size { msw, lsw }, c)
+    }
+
+    #[inline]
+    pub fn overflowing_mul(u2size { msw: x1, lsw: x0 }: Self,
+                           u2size { msw: y1, lsw: y0 }: Self) -> (Self, bool) {
+        let c2 = 0 != x1 && 0 != y1;
+        let (c0,  z0)  = carrying_mul(x0, y0);
+        let (z1x, c1x) = usize::overflowing_mul(x0, y1);
+        let (z1y, c1y) = usize::overflowing_mul(y0, x1);
+        let (z1z, c1z) = usize::overflowing_add(z1x, z1y);
+        let (z1, c) = addc(z1z, c0, c1z);
+        (u2size { msw: z1, lsw: z0 }, c1x | c1y | c2 | c)
     }
 }
 
@@ -137,6 +151,17 @@ impl SubAssign for u2size {
     fn sub_assign(&mut self, other: Self) { *self = *self - other }
 }
 
+impl Mul for u2size {
+    type Output = Self;
+    #[inline]
+    fn mul(self, other: Self) -> Self { Self::overflowing_mul(self, other).0 }
+}
+
+impl MulAssign for u2size {
+    #[inline]
+    fn mul_assign(&mut self, other: Self) { *self = *self * other }
+}
+
 #[inline(always)]
 fn shld(x: usize, y: usize, k: u32) -> usize {
     x << k | mask(0 == k) & y >> (k.wrapping_neg() & (word_bits - 1))
@@ -166,3 +191,24 @@ fn mask(b: bool) -> usize { (b as usize).wrapping_neg() }
 fn mask32(b: bool) -> u32 { (b as u32).wrapping_neg() }
 
 const word_bits: u32 = (::core::mem::size_of::<usize>() << 3) as u32;
+
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+fn carrying_mul(x: usize, y: usize) -> (usize, usize) {
+    let mut c: usize;
+    let mut z: usize;
+    unsafe { asm!("mulq $3" : "=a"(z), "=d"(c) : "%a"(x), "r"(y)) }
+    (c, z)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+#[inline(always)]
+fn carrying_mul(x: usize, y: usize) -> (usize, usize) {
+    let n = 0usize.count_zeros() >> 1;
+    let halves = |x| (x >> n, x & (!0 >> n));
+    let ((x1, x0), (y1, y0)) = (halves(x), halves(y));
+    let (z2, z0) = (x1 * y1, x0 * y0);
+    let z1 = (x1 + x0) * (y1 + y0) - z2 - z0;
+    let (w, c) = usize::overflowing_add(z0, z1 << n);
+    (z2 + z1 >> n + c as usize, w)
+}
