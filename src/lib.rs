@@ -197,7 +197,7 @@ const word_bits: u32 = (::core::mem::size_of::<usize>() << 3) as u32;
 fn carrying_mul(x: usize, y: usize) -> (usize, usize) {
     let mut c: usize;
     let mut z: usize;
-    unsafe { asm!("mulq $3" : "=a"(z), "=d"(c) : "%a"(x), "r"(y)) }
+    unsafe { asm!("mulq $3" : "={rax}"(z), "={rdx}"(c) : "{rax}"(x), "r"(y)) }
     (c, z)
 }
 
