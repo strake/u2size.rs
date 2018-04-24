@@ -210,5 +210,5 @@ fn carrying_mul(x: usize, y: usize) -> (usize, usize) {
     let (z2, z0) = (x1 * y1, x0 * y0);
     let z1 = (x1 + x0) * (y1 + y0) - z2 - z0;
     let (w, c) = usize::overflowing_add(z0, z1 << n);
-    (z2 + z1 >> n + c as usize, w)
+    (z2 + z1 >> n + c as u32, w)
 }
