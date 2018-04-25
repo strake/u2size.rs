@@ -174,14 +174,16 @@ fn shrd(x: usize, y: usize, k: u32) -> usize {
 
 #[inline(always)]
 fn addc(x: usize, y: usize, c: bool) -> (usize, bool) {
-    let (z, d) = usize::overflowing_add(x, y);
-    (z + c as usize, d)
+    let (z, c1) = usize::overflowing_add(x, y);
+    let (z, c2) = usize::overflowing_add(z, c as usize);
+    (z, c1 || c2)
 }
 
 #[inline(always)]
 fn subc(x: usize, y: usize, c: bool) -> (usize, bool) {
-    let (z, d) = usize::overflowing_sub(x, y);
-    (z - c as usize, d)
+    let (z, c1) = usize::overflowing_sub(x, y);
+    let (z, c2) = usize::overflowing_sub(z, c as usize);
+    (z, c1 || c2)
 }
 
 #[inline(always)]
